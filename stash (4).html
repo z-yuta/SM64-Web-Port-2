@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Super Mario 64</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #111; 
+            color: white; 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        #canvas { 
+            display: none; 
+            width: 100vw; 
+            height: 100vh; 
+            max-width: 1280px; 
+            max-height: 720px; 
+            background: black; 
+        }
+        #progress-container { 
+            width: 300px; 
+            padding: 20px; 
+            background: #222; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+        }
+        .bar-bg { 
+            width: 100%; 
+            background: #444; 
+            border-radius: 6px; 
+            overflow: hidden; 
+            margin-top: 4px; 
+        }
+        .bar-fill { 
+            height: 10px; 
+            width: 0%; 
+            transition: width 0.1s; 
+        }
+        #download-bar { background: #3b82f6; }
+        #extract-bar { background: #10b981; }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+    <div id="progress-container">
+        <div style="margin-bottom: 6px;">Downloading... <span id="download-text">0%</span></div>
+        <div class="bar-bg">
+            <div id="download-bar" class="bar-fill"></div>
+        </div>
+        <div style="margin: 12px 0 6px;">Extracting... <span id="extract-text">0%</span></div>
+        <div class="bar-bg">
+            <div id="extract-bar" class="bar-fill"></div>
+        </div>
+    </div>
+
+    <script>
+        // Set up the required Emscripten environment parameters to catch the game modules
+        var Module = {
+            canvas: document.getElementById('canvas'),
+            locateFile: function(path) {
+                // Intercept the default local binary loader and force it onto your CDN file link
+                if (path.endsWith('.wasm')) {
+                    return 'https://cdn.jsdelivr.net/gh/z-yuta/SM64-Web-Port-2@main/sm64.us.f3dex2e.wasm';
+                }
+                return path;
+            },
+            onRuntimeInitialized: function() {
+                // Drop the background trackers and display the active gameplay viewport canvas
+                document.getElementById('progress-container').style.display = 'none';
+                document.getElementById('canvas').style.display = 'block';
+                Module.canvas.focus();
+            }
+        };
+
+        async function fetchAndExecute() {
+            const downloadBar = document.getElementById('download-bar');
+            const downloadText = document.getElementById('download-text');
+            const extractBar = document.getElementById('extract-bar');
+            const extractText = document.getElementById('extract-text');
+
+            try {
+                // Fetch the core engine controller code directly from your public jsDelivr route
+                let response = await fetch('https://cdn.jsdelivr.net/gh/z-yuta/SM64-Web-Port-2@main/sm64.us.f3dex2e.js');
+                if (!response.ok) throw new Error("CDN data response error");
+
+                const reader = response.body.getReader();
+                const contentLength = +response.headers.get('Content-Length') || 1500000;
+                let receivedLength = 0;
+                let chunks = [];
+
+                // Read incoming network streaming chunks to calculate true loader metrics
+                while(true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    receivedLength += value.length;
+                    let percentage = Math.round((receivedLength / contentLength) * 100);
+                    downloadBar.style.width = Math.min(percentage, 100) + '%';
+                    downloadText.innerText = Math.min(percentage, 100) + '%';
+                }
+
+                // Tick up the installation extraction simulation meters smoothly
+                for (let i = 0; i <= 100; i += 10) {
+                    await new Promise(r => setTimeout(r, 30));
+                    extractBar.style.width = i + '%';
+                    extractText.innerText = i + '%';
+                }
+
+                // Process data array chunks and initialize the main engine launcher logic
+                let blob = new Blob(chunks, { type: 'application/javascript' });
+                let script = document.createElement('script');
+                script.src = URL.createObjectURL(blob);
+                document.body.appendChild(script);
+
+            } catch (err) {
+                downloadText.innerText = "Error Fetching Game Files!";
+                console.error(err);
+            }
+        }
+
+        window.addEventListener('load', fetchAndExecute);
+    </script>
+</body>
+</html>
